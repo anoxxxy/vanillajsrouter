@@ -74,6 +74,7 @@
       } = router.parseRoute(route);
 
       internal.routes.push({
+        originalRoute: route,
         handler: handler,
         route: regex,
         paramNames: paramNames,
@@ -117,7 +118,7 @@
           if (!internal.history[fragment]) internal.history.push(fragment);
 
           run_before(internal.routes[i]);
-          handler.call({}, matches, params);
+          handler.call({}, matches, params, originalRoute);
           run_after(internal.routes[i]);
 
           return router;
