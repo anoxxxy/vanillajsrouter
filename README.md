@@ -1,6 +1,6 @@
-# VanillaRouterJS v1.0.0
+# VanillaJSRouter v1.0.0
 
-VanillaRouterJS is a lightweight client-side router developed by anoxxxy aka Anoxy. This library allows for easy hash-based routing in vanilla JavaScript, inspired by RouterJS by Silvio Delgado.
+VanillaJSRouter is a lightweight client-side router developed by anoxxxy aka Anoxy. This library allows for easy hash-based routing in vanilla JavaScript, inspired by RouterJS by Silvio Delgado.
 
 ## Key Features
 
