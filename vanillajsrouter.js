@@ -100,7 +100,8 @@
         const {
           route,
           handler,
-          paramNames
+          paramNames,
+          originalRoute
         } = internal.routes[i];
         const matches = fragment.match(route);
 
