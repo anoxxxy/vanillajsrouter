@@ -1,8 +1,11 @@
-# VanillaJSRouter v1.0.0
+# VanillaJSRouter v1.0.1
 
 VanillaJSRouter is a lightweight client-side router developed by anoxxxy aka Anoxy. This library allows for easy hash-based routing in vanilla JavaScript, inspired by RouterJS by Silvio Delgado.
 
 ## Key Features
+
+- Prevent back navigation to specific routes
+- Check if a route is a checkpoint
 
 - Add routes with dynamic parameters
 - Execute `beforeAll` and `afterAll` middleware functions for global route handling
@@ -131,6 +134,33 @@ Retrieve a list of all registered routes:
 console.log(router.routes());
 ```
 
+### 9. Prevent Back Navigation to Specific Routes
+
+Prevent the user from navigating back to certain routes by using the setPreventBackHashes method:
+
+```javascript
+router.setPreventBackHashes(['/protected', '/admin'], {
+  onBackAttempt: () => {
+    alert('Back navigation is not allowed.');
+  },
+});
+```
+The first parameter is an array of routes to prevent back navigation to.
+The second parameter is an options object with the onBackAttempt callback to handle attempts to navigate back
+
+
+### 10. Check if a Route is a Checkpoint
+
+Use the isCheckpoint method to check if the current route (or a given route) is a checkpoint:
+```javascript
+if (router.isCheckpoint('/protected')) {
+  console.log('This route is a checkpoint.');
+}
+```
+Call router.isCheckpoint() without parameters to check if the current route is a checkpoint.
+Pass a specific route to check it against the list of checkpoints.
+
+
 ## Full Example
 
 Here's a complete example that uses multiple routes and middleware:
@@ -163,6 +193,14 @@ router.add('/about', () => {
 }, () => {
   console.log('After navigating to About page...');
 });
+
+// Prevent back navigation to specific routes
+router.setPreventBackHashes(['/admin', '/settings'], {
+  onBackAttempt: () => {
+    console.warn('Cannot go back to this route!');
+  },
+});
+
 
 // Start the router
 router.start();

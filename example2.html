@@ -1,0 +1,271 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Router Demo</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Toastr for notifications -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet">
+    <style>
+        .content-area {
+            min-height: 400px;
+            padding: 20px;
+        }
+        .active-nav {
+            background-color: #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#home">Router Demo</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#home">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#about">About</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#login">Login</a>
+                    </li>
+                    <li class="nav-item logged-in-only d-none">
+                        <a class="nav-link" href="#dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item logged-in-only d-none">
+                        <a class="nav-link" href="#profile/anoxy">Profile</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item logged-out-only">
+                        <a class="nav-link" href="#login">Sign In</a>
+                    </li>
+                    <li class="nav-item logged-in-only d-none">
+                        <a class="nav-link" href="#" id="logoutBtn">Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <div class="container mt-4">
+        <div id="content" class="content-area">
+            <!-- Content will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Templates -->
+    <script type="text/template" id="homeTemplate">
+        <h1>Welcome to Router Demo</h1>
+        <p>This is a demonstration of our custom Router with navigation prevention.</p>
+        <button class="btn btn-primary" onclick="Router.navigate('about')">Go to About</button>
+    </script>
+
+    <script type="text/template" id="aboutTemplate">
+        <h1>About Us</h1>
+        <p>This is the about page. You can freely navigate back from here.</p>
+        <button class="btn btn-primary" onclick="Router.navigate('home')">Go to Home</button>
+    </script>
+
+    <script type="text/template" id="loginTemplate">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Login</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="loginForm">
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Password</label>
+                                <input type="password" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Login</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <script type="text/template" id="dashboardTemplate">
+        <h1>Dashboard</h1>
+        <p>Welcome to your dashboard! You can't go back to login from here.</p>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Statistics</h5>
+                        <p class="card-text">Some quick example text for the dashboard.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Recent Activity</h5>
+                        <p class="card-text">Your recent activities will appear here.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <script type="text/template" id="profileTemplate">
+        <h1>Profile</h1>
+        <p>This is your profile page. You can navigate freely here.</p>
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">User Information</h5>
+                <p class="card-text">Name: <span data-segment="username">John Doe</span></p>
+                <p class="card-text">Email: john@example.com</p>
+            </div>
+        </div>
+    </script>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <script src="./vanillajsrouter.js"></script>
+    <!-- Include your Router.js here -->
+    <script>
+        // Initialize toastr options
+        toastr.options = {
+            "closeButton": true,
+            "positionClass": "toast-top-right",
+            "timeOut": "3000"
+        };
+
+        let isLoggedIn = false;
+
+
+
+        // Update UI based on auth state
+        function updateAuthUI() {
+            if (isLoggedIn) {
+                $('.logged-in-only').removeClass('d-none');
+                $('.logged-out-only').addClass('d-none');
+            } else {
+                $('.logged-in-only').addClass('d-none');
+                $('.logged-out-only').removeClass('d-none');
+            }
+        }
+
+        // Update active navigation
+        function updateActiveNav() {
+            const currentHash = Router.getFragment();
+            console.log('currentHash: ', currentHash);
+            $('.nav-link').removeClass('active');
+            $(`.nav-link[href="#${currentHash}"]`).addClass('active');
+        }
+
+        // Load template content
+        function loadTemplate(templateId) {
+        	//console.log('loadTemplate: ', templateId);
+
+            const template = $(`#${templateId}Template`).html();
+            $('#content').html(template);
+        }
+
+        // Route handlers
+        
+
+        Router.add('home', () => {
+        	console.log('home');
+            loadTemplate('home');
+            updateActiveNav();
+        });
+
+        Router.add('about', () => {
+        	console.log('about');
+            loadTemplate('about');
+            updateActiveNav();
+        });
+
+        Router.add('login', () => {
+        	console.log('login');
+            	if (isLoggedIn) {
+                Router.navigate('dashboard');
+                return;
+            }
+            
+            loadTemplate('login');
+            updateActiveNav();
+        });
+
+        Router.add('dashboard', () => {
+        	console.log('dashboard');
+            if (!isLoggedIn) {
+                Router.navigate('login');
+                return;
+            }
+            loadTemplate('dashboard');
+            updateActiveNav();
+        });
+
+        Router.add('profile/:username', (params) => {
+        	console.log('profile', params);
+            if (!isLoggedIn) {
+                Router.navigate('login');
+                return;
+            }
+            loadTemplate('profile');
+            updateActiveNav();
+        });
+        // Set up checkpoint hashes
+        Router.setPreventBackHashes(
+            ['login','dashboard'],
+            {
+                onBackAttempt: ({ currentHash, message }) => {
+                		console.log('aa currentHash: ', currentHash);
+                		console.log('aa message: ', message);
+                    toastr.warning(`Navigation prevented: Cannot go back from ${currentHash} page`);
+                }
+            }
+        );
+        Router.apply();
+      	Router.start();
+      	Router.navigate('home');
+      
+        
+        // Handle login
+        $(document).on('submit', '#loginForm', function(e) {
+            e.preventDefault();
+            isLoggedIn = true;
+            updateAuthUI();
+            toastr.success('Successfully logged in!');
+            Router.navigate('dashboard');
+        });
+
+        // Handle logout
+        $('#logoutBtn').click(function(e) {
+            e.preventDefault();
+            isLoggedIn = false;
+            updateAuthUI();
+            toastr.success('Successfully logged out!');
+            Router.navigate('home');
+        });
+
+        // Start Router
+        $(document).ready(function() {
+            updateAuthUI();
+            
+        });
+    </script>
+</body>
+</html>

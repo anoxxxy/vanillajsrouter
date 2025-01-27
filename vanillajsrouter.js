@@ -1,10 +1,10 @@
-/*!
- * VanillaRouterJS v1.0.0 - developed by anoxxxy aka Anoxy
+/*
+ * VanillaRouterJS v1.0.1 - developed by anoxxxy aka Anoxy
  * Inspired by RouterJS by Silvio Delgado (https://github.com/silviodelgado)
  * Licensed under MIT (https://opensource.org/licenses/MIT)
  * https://github.com/anoxxxy/vanillajsrouter
  */
-(function(root, factory) {
+(function (root, factory) {
   if (typeof define === 'function' && define.amd) {
     define([], factory(root));
   } else if (typeof exports === 'object') {
@@ -12,162 +12,142 @@
   } else {
     root.Router = factory(root);
   }
-})(typeof global !== "undefined" ? global : this.window || this.global, function(root) {
+})(typeof global !== "undefined" ? global : this.window || this.global, function (root) {
   'use strict';
 
-  let internal = {
+  const HASH_PREFIX = '^#';
+  const SLASH_SUFFIX = /\/$/;
+
+  const internal = {
     current: null,
     routes: [],
     history: [],
+    preventBackHashes: new Set(),
+    onBackAttempt: null,
     run_before: null,
-    run_after: null
+    run_after: null,
   };
 
-  const run_before = (route) => {
-    if (typeof internal.run_before == 'function') {
-      internal.run_before.call(this);
-    }
-    if (route && route.run_before && typeof route.run_before == 'function') {
-      route.run_before.call(this);
-    }
-  };
-
-  const run_after = (route) => {
-    if (route && route.run_after && typeof route.run_after == 'function') {
-      route.run_after.call(this);
-    }
-    if (typeof internal.run_after == 'function') {
-      internal.run_after.call(this);
-    }
-  };
+  const normalizeHash = (hash) => hash.replace(new RegExp(HASH_PREFIX), '').replace(SLASH_SUFFIX, '');
+  const isFunction = (fn) => typeof fn === 'function';
+  const runHook = (hook, route) => isFunction(hook) && hook.call(null, route);
 
   const router = {
-    getFragment: () => {
-      return window.location.hash.replace(/^#/, '').replace(/\/$/, '');
-    },
+    getFragment: () => normalizeHash(window.location.hash),
+
     parseRoute: (route) => {
-      if (typeof route === 'string' && route.includes(':')) {
-        const paramNames = [];
-        const regex = route.replace(/:[^/]+/g, (match) => {
-          paramNames.push(match.substring(1));
-          return '([^/]+)';
-        });
-        return {
-          regex: new RegExp(`^${regex}$`),
-          paramNames
-        };
-      }
-      return {
-        regex: route,
-        paramNames: []
-      };
-    },
-    add: (route, handler, run_before, run_after) => {
-      if (typeof route === 'function') {
-        handler = route;
-        route = '';
-      }
+		  if (typeof route !== 'string' || !route.includes(':')) {
+		    return { regex: route, paramNames: [] };
+		  }
+		  const paramNames = [];
+		  const regex = route.replace(/:[^/]+/g, (match) => {
+		    paramNames.push(match.slice(1));
+		    return '([^/]+)';
+		  });
+		  return { regex: new RegExp(`^${regex}$`), paramNames };
+		},
 
-      const {
-        regex,
-        paramNames
-      } = router.parseRoute(route);
-
-      internal.routes.push({
-        originalRoute: route,
-        handler: handler,
-        route: regex,
-        paramNames: paramNames,
-        run_before,
-        run_after,
-      });
-
+    setPreventBackHashes: (hashes, options = {}) => {
+      internal.preventBackHashes = new Set(hashes.map(normalizeHash));
+      if (options.onBackAttempt) internal.onBackAttempt = options.onBackAttempt;
       return router;
     },
+
+    isCheckpoint: (hash) => internal.preventBackHashes.has(normalizeHash(hash || router.getFragment())),
+
+    add: (route, handler, run_before, run_after) => {
+      const { regex, paramNames } = router.parseRoute(route);
+      internal.routes.push({ originalRoute: route, handler, route: regex, paramNames, run_before, run_after });
+      return router;
+    },
+
     beforeAll: (handler) => {
       internal.run_before = handler;
       return router;
     },
+
     afterAll: (handler) => {
       internal.run_after = handler;
       return router;
     },
+
     apply: (frg) => {
-      let fragment = frg || router.getFragment();
+      const fragment = frg || router.getFragment();
       if (internal.current) return router;
 
-      for (let i = 0; i < internal.routes.length; i++) {
-        const {
-          route,
-          handler,
-          paramNames,
-          originalRoute
-        } = internal.routes[i];
-        const matches = fragment.match(route);
-
+      for (const routeObj of internal.routes) {
+        const matches = fragment.match(routeObj.route);
         if (matches) {
           matches.shift();
-          const params = {};
-
-          if (paramNames.length > 0) {
-            paramNames.forEach((name, index) => {
-              params[name] = matches[index];
-            });
-          }
-
+          const params = Object.fromEntries(routeObj.paramNames.map((name, i) => [name, matches[i]]));
           internal.current = fragment;
-          if (!internal.history[fragment]) internal.history.push(fragment);
+          if (!internal.history.includes(fragment)) internal.history.push(fragment);
 
-          run_before(internal.routes[i]);
-          handler.call({}, matches, params, originalRoute);
-          run_after(internal.routes[i]);
-
+          runHook(internal.run_before, routeObj);
+          routeObj.handler.call({}, matches, params, routeObj.originalRoute);
+          runHook(internal.run_after, routeObj);
           return router;
         }
       }
       return router;
     },
+
     start: () => {
-      let current = router.getFragment();
-      window.onhashchange = function() {
-        let frg = router.getFragment();
-        if (!frg) {
-          internal.current = null;
-          current = null;
+      const handlePopState = (e) => {
+        const currentHash = router.getFragment();
+        if (router.isCheckpoint(currentHash)) {
+          e.preventDefault();
+          history.pushState(null, document.title, window.location.href);
+          if (isFunction(internal.onBackAttempt)) {
+            internal.onBackAttempt({ currentHash, message: `Navigation prevented: Cannot go back from ${currentHash}` });
+          }
         }
-        if (internal.current != frg) {
+      };
+
+      const handleHashChange = () => {
+        const fragment = router.getFragment();
+        if (internal.current !== fragment) {
           internal.current = null;
-          router.apply(frg);
+          router.apply(fragment);
         }
-      }
-      if (current && !internal.current) {
-        router.apply();
-      }
+      };
+
+      window.addEventListener('popstate', handlePopState);
+      window.addEventListener('hashchange', handleHashChange);
+
+      history.replaceState(null, document.title, window.location.href);
+      if (!internal.current) router.apply();
       return router;
     },
+
     navigate: (path, title) => {
       document.title = title || document.title;
-      path = path.replace(/##/g, '#') || '';
-      window.location.hash = path ? '#' + path : '';
+      window.location.hash = path ? `#${path.replace(/##/g, '#')}` : '';
       return router;
     },
+
     clearHash: () => {
       window.location.hash = '#';
       history.pushState(null, document.title, window.location.pathname + window.location.search);
     },
+
     back: () => {
+      const currentHash = router.getFragment();
+      if (router.isCheckpoint(currentHash)) {
+        if (isFunction(internal.onBackAttempt)) {
+          internal.onBackAttempt({ currentHash, message: `Navigation prevented: Cannot go back from ${currentHash}` });
+        }
+        return router;
+      }
       internal.history.pop();
-      let path = internal.history.pop();
-      path = path || '';
+      const path = internal.history.pop() || '';
       window.location.hash = path;
       return router;
     },
-    checkFragment: (current) => {
-      return router.getFragment().indexOf(current) >= 0;
-    },
-    routes: () => {
-      return internal.routes;
-    }
+
+    checkFragment: (current) => router.getFragment().includes(current),
+
+    routes: () => internal.routes,
   };
 
   return router;
